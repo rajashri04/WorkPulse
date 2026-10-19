@@ -43,6 +43,10 @@ interface AttendanceContextType {
     excludeRequestId?: string
   ) => AttendanceRequest[];
   pendingApprovalsCount: number;
+  managerActiveTab: 'APPROVALS' | 'ATTENDANCE' | 'PAST_REQUESTS';
+  setManagerActiveTab: (tab: 'APPROVALS' | 'ATTENDANCE' | 'PAST_REQUESTS') => void;
+  employeeActiveTab: 'MY_REQUESTS' | 'APPLY';
+  setEmployeeActiveTab: (tab: 'MY_REQUESTS' | 'APPLY') => void;
 }
 
 const STORAGE_KEY_EMPLOYEES = 'workpulse_employees_v1';
@@ -86,6 +90,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return employees[0] || null;
   });
 
+  const [managerActiveTab, setManagerActiveTab] = useState<'APPROVALS' | 'ATTENDANCE' | 'PAST_REQUESTS'>('APPROVALS');
+  const [employeeActiveTab, setEmployeeActiveTab] = useState<'MY_REQUESTS' | 'APPLY'>('MY_REQUESTS');
+
   // Sync to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_EMPLOYEES, JSON.stringify(employees));
@@ -98,6 +105,11 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem(STORAGE_KEY_CURRENT_USER, currentUser.id);
+      if (currentUser.isManager) {
+        setManagerActiveTab('APPROVALS');
+      } else {
+        setEmployeeActiveTab('MY_REQUESTS');
+      }
     } else {
       localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
     }
@@ -105,12 +117,22 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const setCurrentUser = (emp: Employee | null) => {
     setCurrentUserState(emp);
+    if (emp?.isManager) {
+      setManagerActiveTab('APPROVALS');
+    } else if (emp) {
+      setEmployeeActiveTab('MY_REQUESTS');
+    }
   };
 
   const login = (employeeId: string): boolean => {
     const found = employees.find(e => e.id === employeeId);
     if (found) {
       setCurrentUserState(found);
+      if (found.isManager) {
+        setManagerActiveTab('APPROVALS');
+      } else {
+        setEmployeeActiveTab('MY_REQUESTS');
+      }
       return true;
     }
     return false;
@@ -322,6 +344,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       getDatePresence,
       getDepartmentConflicts,
       pendingApprovalsCount,
+      managerActiveTab,
+      setManagerActiveTab,
+      employeeActiveTab,
+      setEmployeeActiveTab,
     }}>
       {children}
     </AttendanceContext.Provider>

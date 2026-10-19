@@ -35,10 +35,11 @@ export const EmployeeDashboard: React.FC = () => {
     employees, 
     applyRequest, 
     cancelRequest, 
-    getDepartmentConflicts 
+    getDepartmentConflicts,
+    employeeActiveTab: activeTab,
+    setEmployeeActiveTab: setActiveTab
   } = useAttendance();
 
-  const [activeTab, setActiveTab] = useState<'MY_REQUESTS' | 'APPLY'>('MY_REQUESTS');
   const [selectedRequest, setSelectedRequest] = useState<AttendanceRequest | null>(null);
 
   // Filter states for requests below
@@ -325,7 +326,7 @@ export const EmployeeDashboard: React.FC = () => {
                 <label className="block text-slate-700 font-bold mb-1.5">
                   Leave Category
                 </label>
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {[
                     { id: 'ANNUAL', label: 'Annual Vacation', left: paidRemaining },
                     { id: 'SICK', label: 'Sick Leave', left: sickRemaining },
@@ -662,14 +663,14 @@ export const EmployeeDashboard: React.FC = () => {
                     className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs hover:border-slate-300 hover:shadow-xs transition-all space-y-3"
                   >
                     {/* Card Top Row: Type Pill, Status Badge & Days Count */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-xl ${
                           isLeave 
                             ? 'bg-amber-50 text-amber-900 border border-amber-200/80' 
                             : 'bg-indigo-50 text-indigo-900 border border-indigo-200/80'
                         }`}>
-                          {isLeave ? <Briefcase className="w-3.5 h-3.5 text-amber-600" /> : <Home className="w-3.5 h-3.5 text-indigo-600" />}
+                          {isLeave ? <Briefcase className="w-3.5 h-3.5 text-amber-600 shrink-0" /> : <Home className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
                           <span>
                             {isLeave 
                               ? `${req.leaveCategory || 'Leave'} Leave` 
@@ -685,7 +686,7 @@ export const EmployeeDashboard: React.FC = () => {
                       </div>
 
                       {/* Status badge */}
-                      <span className={`inline-flex items-center gap-1 font-bold text-xs px-2.5 py-1 rounded-xl border ${
+                      <span className={`inline-flex items-center gap-1 font-bold text-xs px-2.5 py-1 rounded-xl border self-start sm:self-auto ${
                         isApproved
                           ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                           : isRejected

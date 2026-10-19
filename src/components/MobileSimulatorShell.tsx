@@ -194,7 +194,7 @@ export const MobileSimulatorShell: React.FC<MobileSimulatorShellProps> = ({
           </div>
 
           {/* Scrollable Viewport Body */}
-          <div className="flex-1 overflow-y-auto px-2.5 py-3.5 sm:px-3 sm:py-4 space-y-3.5">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-2.5 py-3.5 sm:px-3 sm:py-4 space-y-3.5 pb-6">
             {children}
           </div>
 
