@@ -1,0 +1,6 @@
+{
+  "name": "WorkPulse - Leave & WFH Tracker",
+  "description": "Employee leave and work-from-home management system with team tracking, calendar roster, and manager approvals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

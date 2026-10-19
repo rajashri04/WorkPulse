@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <circle cx="256" cy="256" r="160" fill="url(#accent)" opacity="0.15" />
+  
+  <!-- Stylized Monogram WP & Calendar Marker -->
+  <path d="M140 180 L180 340 L220 230 L256 310 L292 230 L332 340 L372 180" 
+        stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  
+  <!-- Subtle Home / WFH indicator dot -->
+  <circle cx="360" cy="180" r="22" fill="#6366f1" />
+  <!-- Subtle Leave indicator dot -->
+  <circle cx="152" cy="180" r="22" fill="#f59e0b" />
+</svg>
