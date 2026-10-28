@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Default safety catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection testing document
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Employees Collection
+    match /employees/{employeeId} {
+      allow read: if isValidId(employeeId);
+      allow create, update: if isValidId(employeeId) && 
+        request.resource.data.name is string && request.resource.data.name.size() <= 150 &&
+        request.resource.data.email is string && request.resource.data.email.size() <= 150 &&
+        request.resource.data.department is string && request.resource.data.department.size() <= 100;
+      allow delete: if isValidId(employeeId);
+    }
+
+    // Attendance Requests Collection
+    match /requests/{requestId} {
+      allow read: if isValidId(requestId);
+      allow create, update: if isValidId(requestId) &&
+        request.resource.data.employeeId is string && request.resource.data.employeeId.size() <= 100 &&
+        request.resource.data.type in ['LEAVE', 'WFH'] &&
+        request.resource.data.status in ['PENDING', 'APPROVED', 'REJECTED'] &&
+        request.resource.data.startDate is string && request.resource.data.startDate.size() <= 30 &&
+        request.resource.data.endDate is string && request.resource.data.endDate.size() <= 30 &&
+        request.resource.data.reason is string && request.resource.data.reason.size() <= 2000;
+      allow delete: if isValidId(requestId);
+    }
+  }
+}

@@ -84,6 +84,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
+          {/* Real-time Cloud Sync indicator */}
+          <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Firestore Live</span>
+          </div>
+
           {/* Native APK/IPA trigger */}
           <button
             onClick={onOpenPackagingModal}

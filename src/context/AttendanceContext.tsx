@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { 
   Employee, 
   AttendanceRequest, 
@@ -8,6 +8,15 @@ import {
 } from '../types';
 import { INITIAL_EMPLOYEES, INITIAL_REQUESTS } from '../data/mockData';
 import { TODAY_DATE, isDateInRange, calculateBusinessDays } from '../utils/dateUtils';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  onSnapshot 
+} from 'firebase/firestore';
 
 interface AttendanceContextType {
   currentUser: Employee | null;
@@ -18,6 +27,7 @@ interface AttendanceContextType {
   userRole: 'EMPLOYEE' | 'MANAGER' | null;
   employees: Employee[];
   requests: AttendanceRequest[];
+  isCloudSyncActive: boolean;
   applyRequest: (data: {
     type: 'LEAVE' | 'WFH';
     leaveCategory?: any;
@@ -49,67 +59,100 @@ interface AttendanceContextType {
   setEmployeeActiveTab: (tab: 'MY_REQUESTS' | 'APPLY') => void;
 }
 
-const STORAGE_KEY_EMPLOYEES = 'workpulse_employees_v1';
-const STORAGE_KEY_REQUESTS = 'workpulse_requests_v1';
 const STORAGE_KEY_CURRENT_USER = 'workpulse_current_user_v1';
 
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
 
 export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [employees, setEmployees] = useState<Employee[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_EMPLOYEES);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return INITIAL_EMPLOYEES;
-  });
-
-  const [requests, setRequests] = useState<AttendanceRequest[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_REQUESTS);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return INITIAL_REQUESTS;
-  });
+  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+  const [requests, setRequests] = useState<AttendanceRequest[]>(INITIAL_REQUESTS);
+  const [isCloudSyncActive, setIsCloudSyncActive] = useState<boolean>(false);
+  const hasSeededRef = useRef<boolean>(false);
 
   const [currentUser, setCurrentUserState] = useState<Employee | null>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
       if (saved) {
-        const found = employees.find(e => e.id === saved);
+        const found = INITIAL_EMPLOYEES.find(e => e.id === saved);
         if (found) return found;
       }
     } catch {
       // fallback
     }
-    // Default to Alex Rivera (Employee) for instant start, or null
-    return employees[0] || null;
+    return INITIAL_EMPLOYEES[0] || null;
   });
 
   const [managerActiveTab, setManagerActiveTab] = useState<'APPROVALS' | 'ATTENDANCE' | 'PAST_REQUESTS'>('APPROVALS');
   const [employeeActiveTab, setEmployeeActiveTab] = useState<'MY_REQUESTS' | 'APPLY'>('MY_REQUESTS');
 
-  // Sync to localStorage
+  // Real-time Firestore Listeners
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_EMPLOYEES, JSON.stringify(employees));
-  }, [employees]);
+    const employeesCol = collection(db, 'employees');
+    const requestsCol = collection(db, 'requests');
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_REQUESTS, JSON.stringify(requests));
-  }, [requests]);
+    // 1. Subscribe to Employees
+    const unsubEmployees = onSnapshot(employeesCol, async (snapshot) => {
+      setIsCloudSyncActive(true);
+      if (snapshot.empty && !hasSeededRef.current) {
+        hasSeededRef.current = true;
+        // Seed initial employees into Firestore
+        try {
+          for (const emp of INITIAL_EMPLOYEES) {
+            await setDoc(doc(db, 'employees', emp.id), emp);
+          }
+        } catch (err) {
+          handleFirestoreError(err, OperationType.WRITE, 'employees');
+        }
+      } else if (!snapshot.empty) {
+        const loaded: Employee[] = [];
+        snapshot.forEach((d) => loaded.push(d.data() as Employee));
+        setEmployees(loaded);
 
+        // Keep current user in sync with updated balances
+        setCurrentUserState((prev) => {
+          if (!prev) return prev;
+          const match = loaded.find((e) => e.id === prev.id);
+          return match || prev;
+        });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'employees');
+    });
+
+    // 2. Subscribe to Requests
+    const unsubRequests = onSnapshot(requestsCol, async (snapshot) => {
+      setIsCloudSyncActive(true);
+      if (snapshot.empty && !hasSeededRef.current) {
+        hasSeededRef.current = true;
+        // Seed initial requests into Firestore
+        try {
+          for (const req of INITIAL_REQUESTS) {
+            await setDoc(doc(db, 'requests', req.id), req);
+          }
+        } catch (err) {
+          handleFirestoreError(err, OperationType.WRITE, 'requests');
+        }
+      } else if (!snapshot.empty) {
+        const loaded: AttendanceRequest[] = [];
+        snapshot.forEach((d) => loaded.push(d.data() as AttendanceRequest));
+        // Sort newest first
+        loaded.sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
+        setRequests(loaded);
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'requests');
+    });
+
+    return () => {
+      unsubEmployees();
+      unsubRequests();
+    };
+  }, []);
+
+  // Sync active user to localStorage for instant reload
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem(STORAGE_KEY_CURRENT_USER, currentUser.id);
-      if (currentUser.isManager) {
-        setManagerActiveTab('APPROVALS');
-      } else {
-        setEmployeeActiveTab('MY_REQUESTS');
-      }
     } else {
       localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
     }
@@ -143,13 +186,18 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
   };
 
-  const resetDemoData = () => {
-    localStorage.removeItem(STORAGE_KEY_EMPLOYEES);
-    localStorage.removeItem(STORAGE_KEY_REQUESTS);
-    localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
-    setEmployees(INITIAL_EMPLOYEES);
-    setRequests(INITIAL_REQUESTS);
-    setCurrentUserState(INITIAL_EMPLOYEES[0]);
+  const resetDemoData = async () => {
+    try {
+      for (const emp of INITIAL_EMPLOYEES) {
+        await setDoc(doc(db, 'employees', emp.id), emp);
+      }
+      for (const req of INITIAL_REQUESTS) {
+        await setDoc(doc(db, 'requests', req.id), req);
+      }
+      setCurrentUserState(INITIAL_EMPLOYEES[0]);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'resetDemoData');
+    }
   };
 
   // Helper to find conflicts in the same department
@@ -164,7 +212,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (req.department !== department) return false;
       if (req.status !== 'APPROVED' && req.status !== 'PENDING') return false;
       
-      // Check overlap between [startDate, endDate] and [req.startDate, req.endDate]
       const hasOverlap = (startDate <= req.endDate) && (endDate >= req.startDate);
       return hasOverlap;
     });
@@ -192,7 +239,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return { success: false, message: 'Invalid date selection. End date must be on or after start date.' };
     }
 
-    // Handover employee lookup
     let handoverName = '';
     if (data.handoverPersonId) {
       const ho = employees.find(e => e.id === data.handoverPersonId);
@@ -223,72 +269,84 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       appliedAt: new Date().toISOString(),
     };
 
+    // Optimistically update local state & sync to Firestore in real time
     setRequests(prev => [newRequest, ...prev]);
+    setDoc(doc(db, 'requests', newReqId), newRequest).catch(err => {
+      handleFirestoreError(err, OperationType.WRITE, `requests/${newReqId}`);
+    });
 
     return { success: true, message: 'Request submitted successfully. Manager will review.' };
   };
 
-  const approveRequest = (requestId: string, comment?: string) => {
-    setRequests(prev => prev.map(req => {
-      if (req.id !== requestId) return req;
+  const approveRequest = async (requestId: string, comment?: string) => {
+    const targetReq = requests.find(r => r.id === requestId);
+    if (!targetReq) return;
 
-      // Deduct quota if approving
-      if (req.status !== 'APPROVED') {
-        setEmployees(empList => empList.map(emp => {
-          if (emp.id !== req.employeeId) return emp;
-          const balances = { ...emp.leaveBalances };
-          if (req.type === 'LEAVE') {
-            if (req.leaveCategory === 'ANNUAL') {
-              balances.paidLeaveUsed += req.daysCount;
-            } else if (req.leaveCategory === 'SICK') {
-              balances.sickLeaveUsed += req.daysCount;
-            } else if (req.leaveCategory === 'CASUAL') {
-              balances.casualLeaveUsed += req.daysCount;
-            }
-          } else if (req.type === 'WFH') {
-            balances.wfhUsedThisMonth += req.daysCount;
+    const updatedData: Partial<AttendanceRequest> = {
+      status: 'APPROVED',
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: currentUser?.name || 'Manager',
+      managerComment: comment || 'Approved.',
+    };
+
+    // Optimistic update
+    setRequests(prev => prev.map(req => req.id === requestId ? { ...req, ...updatedData } : req));
+
+    // Deduct quota if approving
+    if (targetReq.status !== 'APPROVED') {
+      const emp = employees.find(e => e.id === targetReq.employeeId);
+      if (emp) {
+        const balances = { ...emp.leaveBalances };
+        if (targetReq.type === 'LEAVE') {
+          if (targetReq.leaveCategory === 'ANNUAL') {
+            balances.paidLeaveUsed += targetReq.daysCount;
+          } else if (targetReq.leaveCategory === 'SICK') {
+            balances.sickLeaveUsed += targetReq.daysCount;
+          } else if (targetReq.leaveCategory === 'CASUAL') {
+            balances.casualLeaveUsed += targetReq.daysCount;
           }
-          return { ...emp, leaveBalances: balances };
-        }));
-      }
+        } else if (targetReq.type === 'WFH') {
+          balances.wfhUsedThisMonth += targetReq.daysCount;
+        }
 
-      return {
-        ...req,
-        status: 'APPROVED',
-        reviewedAt: new Date().toISOString(),
-        reviewedBy: currentUser?.name || 'Manager',
-        managerComment: comment || 'Approved.',
-      };
-    }));
+        setEmployees(empList => empList.map(e => e.id === emp.id ? { ...e, leaveBalances: balances } : e));
+        
+        updateDoc(doc(db, 'employees', emp.id), { leaveBalances: balances }).catch(err => {
+          handleFirestoreError(err, OperationType.UPDATE, `employees/${emp.id}`);
+        });
+      }
+    }
+
+    // Update request in Firestore
+    updateDoc(doc(db, 'requests', requestId), updatedData).catch(err => {
+      handleFirestoreError(err, OperationType.UPDATE, `requests/${requestId}`);
+    });
   };
 
   const rejectRequest = (requestId: string, comment?: string) => {
-    setRequests(prev => prev.map(req => {
-      if (req.id !== requestId) return req;
-      return {
-        ...req,
-        status: 'REJECTED',
-        reviewedAt: new Date().toISOString(),
-        reviewedBy: currentUser?.name || 'Manager',
-        managerComment: comment || 'Request declined by manager.',
-      };
-    }));
+    const updatedData: Partial<AttendanceRequest> = {
+      status: 'REJECTED',
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: currentUser?.name || 'Manager',
+      managerComment: comment || 'Request declined by manager.',
+    };
+
+    setRequests(prev => prev.map(req => req.id === requestId ? { ...req, ...updatedData } : req));
+    updateDoc(doc(db, 'requests', requestId), updatedData).catch(err => {
+      handleFirestoreError(err, OperationType.UPDATE, `requests/${requestId}`);
+    });
   };
 
   const cancelRequest = (requestId: string) => {
-    setRequests(prev => prev.map(req => {
-      if (req.id !== requestId) return req;
-      return {
-        ...req,
-        status: 'CANCELLED',
-      };
-    }));
+    setRequests(prev => prev.map(req => req.id === requestId ? { ...req, status: 'CANCELLED' } : req));
+    deleteDoc(doc(db, 'requests', requestId)).catch(err => {
+      handleFirestoreError(err, OperationType.DELETE, `requests/${requestId}`);
+    });
   };
 
   // Helper to build daily presence record for any specific date
   const getDatePresence = (dateStr: string): DailyPresenceRecord[] => {
     return employees.map(emp => {
-      // Find active approved request on this date for this employee
       const activeReq = requests.find(req => 
         req.employeeId === emp.id && 
         req.status === 'APPROVED' && 
@@ -300,15 +358,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       let categoryLabel = '';
 
       if (activeReq) {
-        if (activeReq.type === 'LEAVE') {
-          status = 'ON_LEAVE';
-          categoryLabel = activeReq.leaveCategory ? `${activeReq.leaveCategory.charAt(0) + activeReq.leaveCategory.slice(1).toLowerCase()} Leave` : 'On Leave';
-        } else if (activeReq.type === 'WFH') {
+        if (activeReq.type === 'WFH') {
           status = 'WFH';
-          categoryLabel = activeReq.isHalfDay 
-            ? `WFH (${activeReq.halfDayPeriod === 'AM' ? 'Morning' : 'Afternoon'})` 
-            : 'Work From Home';
-          halfDay = activeReq.halfDayPeriod;
+          halfDay = activeReq.isHalfDay ? activeReq.halfDayPeriod : undefined;
+          categoryLabel = activeReq.isHalfDay ? `WFH (${activeReq.halfDayPeriod})` : 'Work From Home';
+        } else {
+          status = 'ON_LEAVE';
+          halfDay = activeReq.isHalfDay ? activeReq.halfDayPeriod : undefined;
+          categoryLabel = `${activeReq.leaveCategory || 'Personal'} Leave`;
         }
       }
 
@@ -336,6 +393,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       userRole,
       employees,
       requests,
+      isCloudSyncActive,
       applyRequest,
       approveRequest,
       rejectRequest,

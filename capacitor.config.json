@@ -2,18 +2,6 @@
   "appId": "com.workpulse.attendance",
   "appName": "WorkPulse",
   "webDir": "dist",
-  "bundledWebRuntime": false,
-  "plugins": {
-    "SplashScreen": {
-      "launchShowDuration": 1500,
-      "backgroundColor": "#0f172a",
-      "showSpinner": false
-    },
-    "StatusBar": {
-      "style": "DARK",
-      "backgroundColor": "#0f172a"
-    }
-  },
   "server": {
     "androidScheme": "https"
   }

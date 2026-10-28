@@ -8,7 +8,6 @@ import {
   Maximize2, 
   Apple, 
   Cpu, 
-  LogOut,
   User,
   ShieldCheck
 } from 'lucide-react';
@@ -30,7 +29,7 @@ export const MobileSimulatorShell: React.FC<MobileSimulatorShellProps> = ({
   onOpenPackagingModal,
   children,
 }) => {
-  const { currentUser, userRole, logout } = useAttendance();
+  const { currentUser, userRole } = useAttendance();
   const [notification, setNotification] = useState<{ title: string; body: string } | null>(null);
 
   const triggerTestNotification = () => {
@@ -181,14 +180,11 @@ export const MobileSimulatorShell: React.FC<MobileSimulatorShellProps> = ({
             </div>
 
             {currentUser && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={logout}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
+              <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-[11px] font-semibold text-slate-700 max-w-[110px] truncate">
+                  {currentUser.name}
+                </span>
               </div>
             )}
           </div>

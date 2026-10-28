@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Company employee profile with role, department, contact info, and quota balances.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique employee identifier." },
+        "name": { "type": "string", "description": "Full name of the employee." },
+        "email": { "type": "string", "format": "email", "description": "Corporate email address." },
+        "role": { "type": "string", "description": "Employee title or designation." },
+        "department": { "type": "string", "description": "Business department." },
+        "avatar": { "type": "string", "description": "Avatar image URL or path." },
+        "isManager": { "type": "boolean", "description": "Whether the employee has managerial approval rights." },
+        "phone": { "type": "string", "description": "Contact phone number." },
+        "managerId": { "type": "string", "description": "ID of reporting manager." },
+        "leaveBalances": {
+          "type": "object",
+          "description": "Leave quotas and usage counts."
+        }
+      },
+      "required": ["id", "name", "email", "role", "department", "isManager", "leaveBalances"]
+    },
+    "AttendanceRequest": {
+      "title": "AttendanceRequest",
+      "description": "Leave or work-from-home application submitted by an employee for manager review.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique request identifier." },
+        "employeeId": { "type": "string", "description": "ID of applicant employee." },
+        "employeeName": { "type": "string", "description": "Applicant full name." },
+        "employeeAvatar": { "type": "string", "description": "Applicant avatar." },
+        "department": { "type": "string", "description": "Department of applicant." },
+        "type": { "type": "string", "enum": ["LEAVE", "WFH"], "description": "Request category." },
+        "leaveCategory": { "type": "string", "description": "Leave subtype (ANNUAL, SICK, CASUAL, etc)." },
+        "wfhCategory": { "type": "string", "description": "WFH subtype (FULL_DAY, HALF_DAY_AM, etc)." },
+        "startDate": { "type": "string", "description": "Start date in YYYY-MM-DD format." },
+        "endDate": { "type": "string", "description": "End date in YYYY-MM-DD format." },
+        "daysCount": { "type": "number", "description": "Number of working business days." },
+        "isHalfDay": { "type": "boolean", "description": "Whether the request is for half day." },
+        "halfDayPeriod": { "type": "string", "description": "AM or PM for half day." },
+        "reason": { "type": "string", "description": "Applicant explanation." },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"], "description": "Decision state." },
+        "appliedAt": { "type": "string", "description": "ISO timestamp of submission." },
+        "reviewedBy": { "type": "string", "description": "Name of reviewing manager." },
+        "reviewedAt": { "type": "string", "description": "ISO timestamp of review." },
+        "managerComment": { "type": "string", "description": "Feedback or remarks from manager." },
+        "deliverablesSummary": { "type": "string", "description": "Planned deliverables for WFH." },
+        "handoverPersonId": { "type": "string", "description": "ID of colleague covering tasks." },
+        "handoverPersonName": { "type": "string", "description": "Name of colleague covering tasks." },
+        "emergencyPhone": { "type": "string", "description": "Emergency telephone contact." }
+      },
+      "required": ["id", "employeeId", "employeeName", "department", "type", "startDate", "endDate", "daysCount", "reason", "status", "appliedAt"]
+    }
+  },
+  "firestore": {
+    "/employees/{employeeId}": {
+      "schema": { "$ref": "#/entities/Employee" },
+      "description": "Collection of employee directory profiles and leave quotas."
+    },
+    "/requests/{requestId}": {
+      "schema": { "$ref": "#/entities/AttendanceRequest" },
+      "description": "Collection of employee leave and WFH attendance requests."
+    }
+  }
+}
